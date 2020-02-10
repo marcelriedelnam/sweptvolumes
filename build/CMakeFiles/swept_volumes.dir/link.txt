@@ -1,0 +1,1 @@
+/usr/bin/c++     CMakeFiles/swept_volumes.dir/src/main.cpp.o  -o swept_volumes  -Wl,-rpath,"/share/BA/Swept Volumes/build" libswept_volumes_LIB.so 
