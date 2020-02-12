@@ -1,0 +1,5 @@
+build/
+example_data/
+output/
+.vs/
+.vscode/

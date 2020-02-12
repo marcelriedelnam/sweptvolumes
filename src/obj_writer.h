@@ -1,5 +1,5 @@
-#ifndef _WRITE_FILE_H
-#define _WRITE_FILE_H
+#ifndef _OBJECT_WRITER_H
+#define _OBJECT_WRITER_H
 
 #include "common.h"
 
@@ -19,7 +19,6 @@ private:
     void writeFaces(std::vector<std::tuple<IndexType,IndexType,IndexType>> faces);
     void openFile(std::string path);
     void closeFile();
-    std::string toString(Eigen::Matrix<Float, 3, 1> mat);
 
 private:
     std::string path;

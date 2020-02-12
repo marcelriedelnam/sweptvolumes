@@ -1,7 +1,7 @@
 #include "obj_reader.h"
 #include "csv_reader.h"
-#include "write_file.h"
-#include "tranform.h"
+#include "obj_writer.h"
+#include "transform.h"
 
 #include <iostream>
 
@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
 	
 	std::unique_ptr<Mesh> outputMesh = std::move(transform.transformedMesh);
 	// write a *.obj file at the given destination
-	WriteFile writefile("../output/output.obj", outputMesh->vertices, outputMesh->faces);
+	//WriteFile writefile("../output/output.obj", outputMesh->vertices, outputMesh->faces);
 	// writes back the input file
-	//WriteFile writefile("../output/output.obj", inputMesh->vertices, inputMesh->faces);
+	WriteFile writefile("../output/output.obj", inputMesh->vertices, inputMesh->faces);
 }
