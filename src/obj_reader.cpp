@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 #include <iomanip>
+#include <memory>
 
 #include "obj_reader.h"
 
@@ -58,7 +59,7 @@ void ObjReader::insertVertex(string line) {
     Float x, y, z;
     ss >> x >> y >> z;
 
-    vertices.push_back(Vector3(x, y, z));
+	mesh->vertices.push_back(Vector3(x, y, z));
 }
 
 void ObjReader::readFacesFromFile() {
@@ -117,14 +118,5 @@ void ObjReader::insertFace(string line) {
 
     IndexType x, y, z;
     ss >> x >> y >> z; 
-    faces.push_back(std::make_tuple(x, y, z));
-}
-
-std::vector<Vector3, allocV> ObjReader::getVertices() {
-    return vertices;
-
-}
-
-std::vector<std::tuple<IndexType,IndexType,IndexType>>  ObjReader::getFaces() {
-    return faces;
+	mesh->faces.push_back(std::make_tuple(x, y, z));
 }

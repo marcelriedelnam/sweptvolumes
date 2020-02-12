@@ -10,10 +10,10 @@ void Transform::transformVertices(std::vector<Vector3, allocV> vertices,
 {
     // save the original vertices and faces
     for (int i = 0; i < vertices.size(); ++i) {
-        transformedVertices.push_back(vertices[i]);
+        transformedMesh->vertices.push_back(vertices[i]);
     }
     for (const auto &i : faces) {
-        transformedFaces.push_back(std::make_tuple(std::get<0>(i), std::get<1>(i), std::get<2>(i)));
+        transformedMesh->faces.push_back(std::make_tuple(std::get<0>(i), std::get<1>(i), std::get<2>(i)));
     }
 
     // tranform the vertices with the given matrices
@@ -23,8 +23,8 @@ void Transform::transformVertices(std::vector<Vector3, allocV> vertices,
         vert << vertices[i], 1;
         for (int j = 0; j < matrices.size(); ++j) {
             Vector4 temp = matrices[j] * vert;
-            Vector3 res = calculateVector(temp);
-            transformedVertices.push_back(res);
+            Vector3 res = calculateVector(vert);
+            transformedMesh->vertices.push_back(res);
         }
     }
 
@@ -39,21 +39,11 @@ void Transform::transformVertices(std::vector<Vector3, allocV> vertices,
             IndexType newIdx1 = idx1 * matrices.size() + vertices.size() + i;
             IndexType newIdx2 = idx2 * matrices.size() + vertices.size() + i;
 
-            transformedFaces.push_back(std::make_tuple(newIdx0, newIdx1, newIdx2));
+            transformedMesh->faces.push_back(std::make_tuple(newIdx0, newIdx1, newIdx2));
         }
     }
-
-    std::cout << "#v: " << transformedVertices.size() << std::endl;
-    std::cout << "#f: " << transformedFaces.size() << std::endl;
-
-}
-
-std::vector<Vector3, allocV> Transform::getTransformedVertices() {
-    return transformedVertices;
-}
-
-std::vector<std::tuple<IndexType,IndexType,IndexType>> Transform::getTransformedFaces() {
-    return transformedFaces;
+    std::cout << "#v: " << transformedMesh->vertices.size() << std::endl;
+    std::cout << "#f: " << transformedMesh->faces.size() << std::endl;
 }
 
 // transform the homogenous 4x1 vertice vecor back to a 3x1 vector

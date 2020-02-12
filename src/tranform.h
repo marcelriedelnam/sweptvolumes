@@ -12,10 +12,10 @@ public:
               std::vector<std::tuple<IndexType,IndexType,IndexType>> faces,
               std::vector<Matrix4, allocM> matrices) 
     {
-        transformVertices(vertices, faces, matrices);
+    transformedMesh = std::make_unique<Mesh>();
+		transformVertices(vertices, faces, matrices);
     }
-    std::vector<Vector3, allocV> getTransformedVertices();
-    std::vector<std::tuple<IndexType,IndexType,IndexType>> getTransformedFaces();
+
 
 private:
     void transformVertices(std::vector<Vector3, allocV> vertices,
@@ -23,9 +23,8 @@ private:
                            std::vector<Matrix4, allocM> matrices);
     Vector3 calculateVector(Vector4 vec);
 
-private:
-    std::vector<Vector3, allocV> transformedVertices;
-    std::vector<std::tuple<IndexType,IndexType,IndexType>> transformedFaces;
+public:
+	std::unique_ptr<Mesh> transformedMesh;
 };
 
 #endif
