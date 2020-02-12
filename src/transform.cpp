@@ -2,7 +2,7 @@
 #include <string>
 #include <iostream>
 
-#include "tranform.h"
+#include "transform.h"
 
 void Transform::transformVertices(std::vector<Vector3, allocV> vertices,
                                   std::vector<std::tuple<IndexType,IndexType,IndexType>> faces,

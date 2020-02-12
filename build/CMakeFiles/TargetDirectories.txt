@@ -1,4 +1,0 @@
-/share/BA/Swept Volumes/build/CMakeFiles/rebuild_cache.dir
-/share/BA/Swept Volumes/build/CMakeFiles/edit_cache.dir
-/share/BA/Swept Volumes/build/CMakeFiles/swept_volumes_LIB.dir
-/share/BA/Swept Volumes/build/CMakeFiles/swept_volumes.dir
