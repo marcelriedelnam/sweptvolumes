@@ -11,6 +11,7 @@
 
 using std::string;
 using std::vector;
+using std::cout;
 using std::endl;
 
 
@@ -18,7 +19,7 @@ void ObjReader::readVerticesFromFile() {
     std::ifstream file(path);
 
     if (!file.is_open()) {
-        std::cout << "Did not find file " << path << endl;
+        cout << "Did not find file " << path << endl;
         throw std::runtime_error("Did not find file " + path);
     }
 
@@ -44,10 +45,10 @@ void ObjReader::readVerticesFromFile() {
     }
 
     file.close();
-    std::cout << vertexCount << " vertices read." << std::endl;
+    cout << vertexCount << " vertices read." << endl;
 }
 
-void ObjReader::insertVertex(string line) {
+void ObjReader::insertVertex(const string &line) {
     
     string temp;
     for (int i = 2; i < line.length(); ++i) {
@@ -66,7 +67,7 @@ void ObjReader::readFacesFromFile() {
     std::ifstream file(path);
 
     if(!file.is_open()) {
-        std::cout << "Did not find file " << path << endl;
+        cout << "Did not find file " << path << endl;
         throw std::runtime_error("Did not find file " + path);
     }
 
@@ -88,12 +89,12 @@ void ObjReader::readFacesFromFile() {
     }
 
     file.close();
-    std::cout << faceCount << " faces read." << std::endl;
+    cout << faceCount << " faces read." << endl;
 }
 /**
  * For now the program only reads the indices of the vertices of the face, but not the texture coordinates and normals
  */
-void ObjReader::insertFace(string line) { 
+void ObjReader::insertFace(const string &line) { 
     
     bool vertexIndex = true;
 	std::string temp;

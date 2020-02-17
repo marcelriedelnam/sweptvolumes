@@ -2,22 +2,22 @@
 #define _OBJECT_WRITER_H
 
 #include "common.h"
+#include "mesh.h"
 
-class WriteFile {
+class ObjWriter {
 public:
-    WriteFile(const std::string &path, 
-              std::vector<Vector3, allocV> vertices, 
-              std::vector<std::tuple<IndexType,IndexType,IndexType>> faces) : path(path){
+    ObjWriter(const std::string &path, 
+              const Mesh &mesh) : path(path){
         openFile(path);
-        writeVertices(vertices);
-        writeFaces(faces);
+        writeVertices(mesh.vertices);
+        writeFaces(mesh.faces);
         closeFile();
     }
 
 private:
-    void writeVertices(std::vector<Vector3, allocV> vertices);
-    void writeFaces(std::vector<std::tuple<IndexType,IndexType,IndexType>> faces);
-    void openFile(std::string path);
+    void writeVertices(const std::vector<Vector3, allocV> &vertices);
+    void writeFaces(const std::vector<std::tuple<IndexType,IndexType,IndexType>> &faces);
+    void openFile(const std::string &path);
     void closeFile();
 
 private:

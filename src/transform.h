@@ -8,20 +8,17 @@
 
 class Transform {
 public:
-    Transform(std::vector<Vector3, allocV> vertices,
-              std::vector<std::tuple<IndexType,IndexType,IndexType>> faces,
-              std::vector<Matrix4, allocM> matrices) 
+    Transform(const Mesh &mesh,
+              const std::vector<Matrix4, allocM> &matrices) 
     {
-    transformedMesh = std::make_unique<Mesh>();
-		transformVertices(vertices, faces, matrices);
+      transformedMesh = std::make_unique<Mesh>();
+      transformVertices(mesh, matrices);
     }
 
 
 private:
-    void transformVertices(std::vector<Vector3, allocV> vertices,
-                           std::vector<std::tuple<IndexType,IndexType,IndexType>> faces,
-                           std::vector<Matrix4, allocM> matrices);
-    Vector3 calculateVector(Vector4 vec);
+    void transformVertices(const Mesh &mesh,
+                           const std::vector<Matrix4, allocM> &matrices);
 
 public:
 	std::unique_ptr<Mesh> transformedMesh;

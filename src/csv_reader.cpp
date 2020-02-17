@@ -45,7 +45,7 @@ void CSVReader::readMatricesFromFile() {
 
 }
 
-void CSVReader::insertMatrix(string line) {
+void CSVReader::insertMatrix(string &line) {
     std::replace(line.begin(), line.end(), ';', ' ');
 	std::stringstream ss(line);
 
@@ -66,12 +66,6 @@ void CSVReader::insertMatrix(string line) {
            a31, a32, a33, a34, 
            a41, a42, a43, a44;
 
-    matrices.push_back(mat);
+    matrices->push_back(mat);
 
-}
-
-//TODO: preciosion bei ss << value?
-
-std::vector<Matrix4, allocM> CSVReader::getMatrices() {
-    return matrices;
 }

@@ -14,25 +14,24 @@ using std::to_string;
 
 std::ofstream file;
 
-void WriteFile::openFile(string path) {
+void ObjWriter::openFile(const string &path) {
 	file.open(path);
 }
 
-void WriteFile::closeFile() {
+void ObjWriter::closeFile() {
 	file.close();
 }
 
-void WriteFile::writeVertices(vector<Vector3, allocV> vertices) {
+void ObjWriter::writeVertices(const vector<Vector3, allocV> &vertices) {
 	cout << "Writing vertices." << endl;
 	
-	Vector3 temp;
+
 	for (int i = 0; i < vertices.size(); ++i) { 
-		temp = vertices[i];
-		file << "v " << temp.segment<1>(0) << ' ' << temp.segment<1>(1) << ' ' << temp.segment<1>(2) << '\n';
+		file << "v " << vertices[i][0] << ' ' << vertices[i][1] << ' ' << vertices[i][2] << '\n';
 	}
 }
 
-void WriteFile::writeFaces(vector<std::tuple<IndexType,IndexType,IndexType>> faces) {
+void ObjWriter::writeFaces(const vector<std::tuple<IndexType,IndexType,IndexType>> &faces) {
 	cout << "Writing faces." <<endl;
 	
 	for (const auto &i : faces) {

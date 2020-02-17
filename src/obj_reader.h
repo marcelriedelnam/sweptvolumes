@@ -15,8 +15,8 @@ public:
 private:
     void readVerticesFromFile();
     void readFacesFromFile();
-    void insertVertex(std::string line);
-    void insertFace(std::string line);
+    void insertVertex(const std::string &line);
+    void insertFace(const std::string &line);
 
 public:
 	std::unique_ptr<Mesh> mesh;

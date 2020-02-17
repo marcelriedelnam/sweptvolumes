@@ -6,6 +6,7 @@
 class CSVReader {
 public:
     CSVReader(const std::string &path) : path(path) {
+        matrices = std::make_unique<std::vector<Matrix4, allocM>>();
         readMatricesFromFile();
     }
 
@@ -13,11 +14,13 @@ public:
 
 private:
     void readMatricesFromFile();
-    void insertMatrix(std::string line);
+    void insertMatrix(std::string &line);
+
+public:
+    std::unique_ptr<std::vector<Matrix4, allocM>> matrices;
 
 private:
     std::string path;
-    std::vector<Matrix4, allocM> matrices;
 
 };
 
