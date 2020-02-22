@@ -13,7 +13,8 @@ using std::cout;
 using std::vector;
 using std::string;
 
-void CSVReader::readMatricesFromFile() {
+std::unique_ptr<vector<Matrix4, allocM>> CSVReader::read(const std::string &path) {
+    auto matrices = std::make_unique<vector<Matrix4, allocM>>();
     std::ifstream file(path);
 
     if (!file.is_open()) {
@@ -21,31 +22,22 @@ void CSVReader::readMatricesFromFile() {
         throw std::runtime_error("Did not find file " + path);
     }
 
-    IndexType matrixCount = 0;
     string input_line;
-    while (std::getline(file, input_line)) { 
-		if (input_line[0] == 'M') {
-			continue;
-		}
-        matrixCount++;
-    }
-
-    file.clear();
-    file.seekg(0, std::ios::beg);
 
     while (std::getline(file, input_line)) {
         if (input_line[0] == 'M') {
             continue;
         }
-        insertMatrix(input_line);
+        insertMatrix(input_line, *matrices);
     }
 
     file.close();
-    cout << matrixCount << " matrices read." << endl;
+    cout << matrices->size() << " matrices read." << endl;
 
+    return matrices;
 }
 
-void CSVReader::insertMatrix(string &line) {
+void CSVReader::insertMatrix(string line, vector<Matrix4, allocM> &matrices) {
     std::replace(line.begin(), line.end(), ';', ' ');
 	std::stringstream ss(line);
 
@@ -66,6 +58,6 @@ void CSVReader::insertMatrix(string &line) {
            a31, a32, a33, a34, 
            a41, a42, a43, a44;
 
-    matrices->push_back(mat);
+    matrices.push_back(mat);
 
 }

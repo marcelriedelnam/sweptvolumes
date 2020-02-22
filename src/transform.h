@@ -8,20 +8,19 @@
 
 class Transform {
 public:
-    Transform(const Mesh &mesh,
-              const std::vector<Matrix4, allocM> &matrices) 
-    {
-      transformedMesh = std::make_unique<Mesh>();
-      transformVertices(mesh, matrices);
-    }
-
+  static std::unique_ptr<Mesh> transform(const Mesh &mesh, 
+                                         const std::vector<Matrix4, allocM> &matrices);
 
 private:
-    void transformVertices(const Mesh &mesh,
-                           const std::vector<Matrix4, allocM> &matrices);
+    Transform() {}
 
-public:
-	std::unique_ptr<Mesh> transformedMesh;
+    static void transformVerticesNaive(const Mesh &inputMesh,
+                                       const std::vector<Matrix4, allocM> &matrices,
+                                       Mesh &outputMesh);
+    static void transformVerticesDM(const Mesh &inputMesh,
+                                    const std::vector<Matrix4, allocM> &matrices,
+                                    Mesh &outputMesh);
+
 };
 
 #endif

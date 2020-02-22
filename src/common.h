@@ -12,7 +12,9 @@ using IndexType = uint64_t;
 using Vector3 = Eigen::Matrix<Float, 3, 1>;
 using Vector4 = Eigen::Matrix<Float, 4, 1>;
 using Matrix4 = Eigen::Matrix<Float, 4, 4>;
+using Matrix3 = Eigen::Matrix<Float, 3, 3>;
 using allocV = Eigen::aligned_allocator<Vector3>;
 using allocM = Eigen::aligned_allocator<Matrix4>;
+using IndexTypePair = std::tuple<IndexType, IndexType>;
 
 #endif

@@ -4,26 +4,32 @@
 #include "transform.h"
 
 #include <iostream>
+#include <exception>
 
 
 int main(int argc, char **argv) {
 
+	std::unique_ptr<Mesh> inputMesh;
+
 	// read the *.obj file from the first argument
-	// unique_ptr<Mesh> mesh = ObjReader::read(argv[1]);
-	ObjReader objreader(argv[1]); 
-
+	try {
+		inputMesh = ObjReader::read(argv[1]);
+	}
+	catch(std::exception& e) {
+		std::cerr << "File " << argv[1] << " malformed: " << e.what() << std::endl;
+		return 1;
+	}
+	
 	// read the *.csv file from the second argument
-	CSVReader csvreader(argv[2]); 
-
-	std::unique_ptr<Mesh> inputMesh = std::move(objreader.mesh);
-	std::unique_ptr<std::vector<Matrix4, allocM>> transformationMatrices = std::move(csvreader.matrices);
+	std::unique_ptr<std::vector<Matrix4, allocM>> transformedMatrices;
+	transformedMatrices = CSVReader::read(argv[2]); 
 
 	// transform the vertices
-	Transform transform(*inputMesh, *transformationMatrices);
-	
-	std::unique_ptr<Mesh> outputMesh = std::move(transform.transformedMesh);
+	std::unique_ptr<Mesh> outputMesh;
+	outputMesh = Transform::transform(*inputMesh, *transformedMatrices);
+
 	// write a *.obj file at the given destination
-	//WriteFile writefile("../output/output.obj", *outputMesh);
+	ObjWriter objWriter("../output/output.obj", *outputMesh);
 	// writes back the input file
-	ObjWriter objwriter("../output/output.obj", *inputMesh);
+	// ObjWriter objwriter("../output/output.obj", *inputMesh);
 }

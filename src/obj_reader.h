@@ -6,23 +6,14 @@
 
 class ObjReader {
 public:
-    ObjReader(const std::string &path) : path(path) {
-		mesh = std::make_unique<Mesh>();
-        readVerticesFromFile();
-        readFacesFromFile();
-    }
+    static std::unique_ptr<Mesh> read(const std::string &path);
     
 private:
-    void readVerticesFromFile();
-    void readFacesFromFile();
-    void insertVertex(const std::string &line);
-    void insertFace(const std::string &line);
+    ObjReader() {}
 
-public:
-	std::unique_ptr<Mesh> mesh;
-
-private:
-    std::string path;
+    static void insertVertex(const std::string &line, Mesh &mesh);
+    static void insertPairs( const std::string &line, Mesh &mesh);
+    static void insertNormal(const std::string &line, Mesh &mesh);
 };
 
 #endif

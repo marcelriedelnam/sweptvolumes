@@ -10,13 +10,13 @@ public:
               const Mesh &mesh) : path(path){
         openFile(path);
         writeVertices(mesh.vertices);
-        writeFaces(mesh.faces);
         closeFile();
     }
 
 private:
     void writeVertices(const std::vector<Vector3, allocV> &vertices);
     void writeFaces(const std::vector<std::tuple<IndexType,IndexType,IndexType>> &faces);
+    void writeNormals(const std::vector<Vector3, allocV> &normals);
     void openFile(const std::string &path);
     void closeFile();
 
