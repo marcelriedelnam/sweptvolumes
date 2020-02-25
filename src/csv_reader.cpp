@@ -28,6 +28,9 @@ std::unique_ptr<vector<Matrix4, allocM>> CSVReader::read(const std::string &path
         if (input_line[0] == 'M') {
             continue;
         }
+        if(input_line.size() == 0) {
+            continue;
+        }
         insertMatrix(input_line, *matrices);
     }
 

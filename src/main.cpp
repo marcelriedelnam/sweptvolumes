@@ -30,6 +30,4 @@ int main(int argc, char **argv) {
 
 	// write a *.obj file at the given destination
 	ObjWriter objWriter("../output/output.obj", *outputMesh);
-	// writes back the input file
-	// ObjWriter objwriter("../output/output.obj", *inputMesh);
 }

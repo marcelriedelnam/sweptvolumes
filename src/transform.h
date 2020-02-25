@@ -20,6 +20,10 @@ private:
     static void transformVerticesDM(const Mesh &inputMesh,
                                     const std::vector<Matrix4, allocM> &matrices,
                                     Mesh &outputMesh);
+    static void transformVerticesRA(const Mesh &inputMesh,
+                                    const std::vector<Matrix4, allocM> &matrices,
+                                    Mesh &outputMesh);
+    static std::tuple<Vector3,Vector3> calculateRA(Matrix4 &matrix);
 
 };
 
