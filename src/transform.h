@@ -12,6 +12,10 @@ public:
                                          const std::vector<Matrix4, allocM> &matrices);
 
 private:
+    enum Cases {
+      FIRST, MID, LAST
+    };
+
     Transform() {}
 
     static void transformVerticesNaive(const Mesh &inputMesh,
@@ -24,6 +28,9 @@ private:
                                     const std::vector<Matrix4, allocM> &matrices,
                                     Mesh &outputMesh);
     static std::tuple<Vector3,Vector3> calculateRA(Matrix4 &matrix);
+    static Matrix4 invert(Matrix4 matrix);
+    static bool insertIfCriteria(const Vector4 &hv, const Matrix4 &diffMat, 
+                                 const std::vector<Vector3, allocV> &Ns, Cases c);
 
 };
 

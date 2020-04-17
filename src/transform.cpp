@@ -1,6 +1,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <algorithm>
 
 #include "transform.h"
 
@@ -48,77 +49,97 @@ void Transform::transformVerticesNaive(const Mesh &inputMesh,
  * respectively.
  * 
  * In this case points refer to vertices.
- * 
- * TODO: special cases at time i = first/last. (For now, simply added ALL the vertices at that time)
  */
 void Transform::transformVerticesDM(const Mesh &inputMesh,
                                     const std::vector<Matrix4, allocM> &matrices,
                                     Mesh &outputMesh)
 {
-    // for special cases at first and last time step, take all vertices.
-    for (int i = 0; i < inputMesh.vertices.size(); ++i) {
-        Vector4 vertex;
-        vertex << inputMesh.vertices[i], 1;
+    for (int i = 0; i < matrices.size(); ++i) {
+        int matSize = matrices.size();
 
-        int firstIdx = 0;
-        int lastIdx = matrices.size() - 1;
+        std::vector<Vector3, allocV> Ns;
+        IndexType currVertexIdx = 0;
 
-        Vector4 firstVertex = matrices[firstIdx] * vertex;
-        Vector4 lastVertex = matrices[lastIdx] * vertex;
+        Matrix4 diffMat;
+        if (i == 0) diffMat = matrices[1] - matrices[0];
+        else if (i == matSize - 1) diffMat = matrices[matSize - 1] - matrices[matSize - 2];
+        else diffMat = matrices[i+1] - matrices[i-1];
 
-        Vector3 firstVertices(firstVertex[0], firstVertex[1], firstVertex[2]);
-        firstVertices /= firstVertex[3];
-
-        Vector3 lastVertices(lastVertex[0], lastVertex[1], lastVertex[2]);
-        lastVertices /= lastVertex[3];
-
-        outputMesh.vertices.push_back(firstVertices);
-        outputMesh.vertices.push_back(lastVertices);
-    }
-
-    for (int i = 1; i < matrices.size() - 1; ++i) {
-        std::vector<bool> isInserted;
-        isInserted.resize(inputMesh.vertices.size(), false);
-
-        Matrix4 diffMat = matrices[i+1] - matrices[i-1];
-        Matrix4 currentMat = matrices[i];
         for (int j = 0; j < inputMesh.vertexNormalPairs.size(); ++j) {
             IndexType vertexIdx = std::get<0>(inputMesh.vertexNormalPairs[j]);
             IndexType normalIdx = std::get<1>(inputMesh.vertexNormalPairs[j]);
 
-            Vector4 vertex;
-            vertex << inputMesh.vertices[vertexIdx], 1;
-            Vector4 normal;
-            normal << inputMesh.normals[normalIdx], 0;
+            if (vertexIdx != currVertexIdx && j != 0) {
+                Vector4 hv;
+                hv << inputMesh.vertices[currVertexIdx], 1;
+                Cases c = i == 0 ? FIRST : (i == matSize - 1 ? LAST : MID);
+                Vector4 hV = matrices[i] * hv;
+                Vector3 V(hV[0], hV[1], hV[2]);
+                V /= hV[3];
 
-            // compute DM of point v and normal at time i
-            Vector4 v_diff = (diffMat * vertex).normalized();
-            Vector4 n_tnf = currentMat * normal;
-            
-            // compute the position of the point v at the time i
-            Vector4 v_hom = currentMat * vertex;
-            Vector3 v(v_hom[0], v_hom[1], v_hom[2]);
-            v /= v_hom[3];
-            
-            // compute the measure of orthogonality
-            Vector4 prod = (currentMat.inverse() * diffMat * v_diff).normalized();
-            Float measure = normal.dot(prod);
+                if(insertIfCriteria(hv, diffMat, Ns, c)) {
+                    outputMesh.vertices.push_back(V);
+                }
 
-            // check if DM and normal are orthogonal
-            // only add a vertice if it wasn't added before
-            const Float eps = 0.1;
-            if (v_diff.dot(n_tnf) < eps && v_diff.dot(n_tnf) > -eps) {
-                if (!isInserted.at(vertexIdx)) {
-                    isInserted.at(vertexIdx) = true;
-                    outputMesh.vertices.push_back(v);
-                }  
+                Ns.clear();
+                currVertexIdx = vertexIdx;
             }
-           
+
+            
+            Vector4 hn;
+            hn << inputMesh.normals[normalIdx], 0;
+
+            Vector4 hN = matrices[i] * hn; // correctly it would be (currentMat^T)^(-1),
+                                                 // equal to currentMat due to orthogonality
+            Vector3 N(hN[0], hN[1], hN[2]);
+            Ns.push_back(N);
+        
         }
+        Vector4 hv;
+        hv << inputMesh.vertices[currVertexIdx], 1;
+        Cases c = i == 0 ? FIRST : (i == matSize - 1 ? LAST : MID);
+        Vector4 hV = matrices[i] * hv;
+        Vector3 V(hV[0], hV[1], hV[2]);
+        V /= hV[3];
+
+        if(insertIfCriteria(hv, diffMat, Ns, c)) {
+            outputMesh.vertices.push_back(V);
+        }
+
+        Ns.clear();
     }
 
-    cout << "Resulting vertices: " << outputMesh.vertices.size() << endl;;
+    cout << "Resulting vertices: " << outputMesh.vertices.size() << endl;
 
+}
+
+bool Transform::insertIfCriteria(const Vector4 &hv, const Matrix4 &diffMat, 
+                         const std::vector<Vector3, allocV> &Ns, Cases c) {
+    Vector4 hv_diff = diffMat * hv;
+    Vector3 v_diff = Vector3(hv_diff[0], hv_diff[1], hv_diff[2]).normalized();
+
+    bool isNeg = false;
+    bool isPos = false;
+    for (auto& N : Ns) {
+        bool sign = v_diff.dot(N) > 0;
+        isNeg = isNeg || !sign;
+        isPos = isPos || sign;
+    }
+
+    if (isNeg && isPos) {
+        return true;
+    }
+
+    const Float eps = 0.1;
+    for (auto& N : Ns) {
+        if (c == FIRST && v_diff.dot(N) < eps) {
+            return true;
+        }
+        else if (c == LAST && v_diff.dot(N) > - eps) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /*
@@ -129,40 +150,29 @@ void Transform::transformVerticesRA(const Mesh &inputMesh,
                                     Mesh &outputMesh) 
 {
 
-    // for special cases at first and last time step, take all vertices.
-    for (int i = 0; i < inputMesh.vertices.size(); ++i) {
-        Vector4 vertex;
-        vertex << inputMesh.vertices[i], 1;
-
-        int firstIdx = 0;
-        int lastIdx = matrices.size() - 1;
-
-        Vector4 firstVertex = matrices[firstIdx] * vertex;
-        Vector4 lastVertex = matrices[lastIdx] * vertex;
-
-        Vector3 firstVertices(firstVertex[0], firstVertex[1], firstVertex[2]);
-        firstVertices /= firstVertex[3];
-
-        Vector3 lastVertices(lastVertex[0], lastVertex[1], lastVertex[2]);
-        lastVertices /= lastVertex[3];
-
-        outputMesh.vertices.push_back(firstVertices);
-        outputMesh.vertices.push_back(lastVertices);
-    }
-
-    for (int i = 1; i < matrices.size() - 1; ++i) {
+    for (int i = 0; i < matrices.size(); ++i) {
         std::vector<bool> isInserted;
         isInserted.resize(inputMesh.vertices.size(), false);
 
-        Matrix4 axisMat = matrices[i-1] * matrices[i+1].inverse() * matrices[i];
+        Matrix4 axisMat;
         Matrix4 currentMat = matrices[i];
+        if (i == 0) {
+            axisMat = matrices[i] * invert(matrices[i+1]) * matrices[i];
+        }
+        if (i == matrices.size() - 1) {
+            axisMat = matrices[i-1] * invert(matrices[i]) * matrices[i];
+        }
+        else {
+            axisMat = matrices[i-1] * invert(matrices[i+1]) * matrices[i];
+        }
+        
 
         std::tuple<Vector3, Vector3> rotationAxis = calculateRA(axisMat);
 
         Vector3 axisPosition = std::get<0>(rotationAxis);
         Vector3 axisDirection = std::get<1>(rotationAxis);
 
-        auto inverseMat = matrices[i].inverse();
+        auto inverseMat = invert(matrices[i]);
 
         Vector4 pos_hom;
         pos_hom << axisPosition, 1;
@@ -213,6 +223,34 @@ void Transform::transformVerticesRA(const Mesh &inputMesh,
     cout << "Resulting vertices: " << outputMesh.vertices.size() << endl;
 
 }
+/*
+ * Homogeneous matrices can be inverted easier than other 4x4 matrices.
+ * This function takes advanatge of that and calculates the inverse of a homogeneous 4x4 matrix.
+ *  
+ *  | R^T | -(R^T) * t  |
+ *  |_____|_____________|
+ *  |0 0 0|      1      |
+ * 
+ *  R^T is the transposed matrix of rotation matrix.
+ *  t is the tranlation vector of the homogeneous 4x4 matrix.
+ */
+Matrix4 Transform::invert(Matrix4 matrix) {
+    Vector3 translation = matrix.block<3,1>(0,3);
+    Matrix3 rotation = matrix.block<3,3>(0,0);
+
+    Matrix3 newRot = rotation.transpose();
+    Vector3 newTrans = - (rotation.transpose() * translation);
+
+    Matrix4 res;
+    res << 0, 0, 0, 0,
+           0, 0, 0, 0,
+           0, 0, 0, 0,
+           0, 0, 0, 1;
+    res.block<3,3>(0,0) = newRot;
+    res.block<3,1>(0,3) = newTrans;
+
+    return res;
+}
 
 std::tuple<Vector3,Vector3> Transform::calculateRA(Matrix4 &matrix) {
     Vector3 translation = matrix.block<3,1>(0,3);
@@ -227,3 +265,53 @@ std::tuple<Vector3,Vector3> Transform::calculateRA(Matrix4 &matrix) {
 
     return std::make_tuple(position, direction);
 }
+
+/*
+ * calculates the AABB (axis aligned bounding box) of the object at a certain time
+ *
+std:vector<Vector3, allocV> Transform::getAABB(std::vector<Vector3, allocV> vertices, Matrix4 matrix) {
+    Float x_min, x_max, y_min, y_max, z_min, z_max;
+    for (int i = 0; i < vertices.size(); ++i) {
+        
+        Vecor3 vertex = matrix * vertices[i];
+
+        if (i == 0) {
+            x_min = vertex[0];
+            x_max = vertex[0];
+            y_min = vertex[1];
+            y_max = vertex[1];
+            z_min = vertex[2];
+            z_max = vertex[2];
+            break;
+        }
+
+        x_val = vertex[0];
+        y_val = vertex[1];
+        z_val = vertex[2];
+
+        if (x_val < x_min) x_min = x_val;
+        else if (x_val > x_max) x_max = x_val;
+        if (y_val < y_min) y_min = y_val;
+        else if (y_val > y_max) y_max = y_val;
+        if (z_val < z_min) z_min = z_val;
+        else if (z_val > z_max) z_max = z_val;
+    }
+                7---8
+    z          /   /|
+    |  y      5---6 4
+    | /       |   |/
+    |/___ x   1---2
+
+    Vector3 one, two, three, four, five, six, seven, eight;
+    one << x_min, y_min, z_min;
+    two << x_max, y_min, z_min;
+    three << x_min, y_max, z_min;
+    four << x_max, y_max, z_min;
+    five << x_min, y_min, z_max;
+    six << x_max, y_min, z_max;
+    seven << x_min, y_max, z_max;
+    eight << x_max, y_max, z_max;
+
+    std::vector<Vector3, allocV> aabb = {one, two, three, four, five, six, seven, eight};
+    return aabb;
+}*/

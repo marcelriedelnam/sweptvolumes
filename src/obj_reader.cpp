@@ -43,6 +43,9 @@ std::unique_ptr<Mesh> ObjReader::read(const std::string &path) {
     cout << mesh->normals.size() << " normals read." << endl;
     cout << mesh->vertexNormalPairs.size() << " vertex-normal pairs read."  << endl;
 
+    // sort the vertex-normal pairs for later calculations
+    std::sort(mesh->vertexNormalPairs.begin(), mesh->vertexNormalPairs.end());
+
     return mesh;
 }
 
@@ -60,8 +63,8 @@ void ObjReader::insertVertex(const string &line, Mesh &mesh) {
 
     Vector3 vec(x, y, z);
 
-    const Float scale = 0.001; // m to mm
-    vec *= scale;
+    //const Float scale = 0.001; // m to mm
+    //vec *= scale;
 
 	mesh.vertices.push_back(vec);
 }
