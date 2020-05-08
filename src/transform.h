@@ -28,9 +28,14 @@ private:
                                     const std::vector<Matrix4, allocM> &matrices,
                                     Mesh &outputMesh);
     static std::tuple<Vector3,Vector3> calculateRA(Matrix4 &matrix);
-    static Matrix4 invert(Matrix4 matrix);
-    static bool insertIfCriteria(const Vector4 &hv, const Matrix4 &diffMat, 
-                                 const std::vector<Vector3, allocV> &Ns, Cases c);
+    static Matrix4 invert(const Matrix4 &matrix);
+    static bool insertCriteria(const Vector4 &hv, const Matrix4 &diffMat, const Matrix4 &before,
+                                 const Matrix4 &after, const std::vector<Vector3, allocV> &Ns, Cases c);
+    static std::vector<Vector3, allocV> getAABB(const Mesh &inputMesh);
+    static Float getLargestMovement(const std::vector<Vector3, allocV> &aabb, const Matrix4 &current, 
+                                    const Matrix4 &next);
+
+                                 
 
 };
 

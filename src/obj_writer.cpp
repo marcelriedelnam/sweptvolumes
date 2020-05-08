@@ -27,7 +27,15 @@ void ObjWriter::writeVertices(const vector<Vector3, allocV> &vertices) {
 	
 
 	for (int i = 0; i < vertices.size(); ++i) { 
-		file << "v " << vertices[i][0] << ' ' << vertices[i][1] << ' ' << vertices[i][2] << '\n';
+		Vector3 vec = vertices[i];
+		Matrix3 rotateX;
+		rotateX << 1,  0, 0,
+		           0,  0, 1,
+				   0, -1, 0;
+
+		Vector3 vertex = rotateX * vec;
+
+		file << "v " << vertex[0] << ' ' << vertex[1] << ' ' << vertex[2] << '\n';
 	}
 }
 
@@ -45,6 +53,14 @@ void ObjWriter::writeNormals(const vector<Vector3, allocV> &normals) {
 	
 
 	for (int i = 0; i < normals.size(); ++i) { 
-		file << "vn " << normals[i][0] << ' ' << normals[i][1] << ' ' << normals[i][2] << '\n';
+		Vector3 vec = normals[i];
+		Matrix3 rotateX;
+		rotateX << 1,  0, 0,
+		           0,  0, 1,
+				   0, -1, 0;
+
+		Vector3 normal = rotateX * vec;
+
+		file << "vn " << normal[0] << ' ' << normal[1] << ' ' << normal[2] << '\n';
 	}
 }

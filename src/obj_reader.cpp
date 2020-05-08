@@ -26,15 +26,14 @@ std::unique_ptr<Mesh> ObjReader::read(const std::string &path) {
     }
 
     string input_line;
+    mesh->longestEdge = 0;
 
     while (std::getline(file, input_line)) {
         if (input_line[0] == 'v' && input_line[1] == ' ') {
             insertVertex(input_line, *mesh);
-        } else if (input_line[0] == 'v' && input_line[1] == 'n') {
-            insertNormal(input_line, *mesh);
         } else if (input_line[0] == 'f' && input_line[1] == ' ') {
-            insertPairs(input_line, *mesh);
-        } 
+            handleNormalsAndPairs(input_line, *mesh);
+        }
     }
 
     file.close();
@@ -45,7 +44,6 @@ std::unique_ptr<Mesh> ObjReader::read(const std::string &path) {
 
     // sort the vertex-normal pairs for later calculations
     std::sort(mesh->vertexNormalPairs.begin(), mesh->vertexNormalPairs.end());
-
     return mesh;
 }
 
@@ -63,73 +61,82 @@ void ObjReader::insertVertex(const string &line, Mesh &mesh) {
 
     Vector3 vec(x, y, z);
 
+    Matrix3 rotateX;
+    rotateX << 1, 0,  0,
+               0, 0, -1,
+               0, 1,  0;
+    
+    Vector3 vertex = rotateX * vec;
+
     //const Float scale = 0.001; // m to mm
     //vec *= scale;
 
-	mesh.vertices.push_back(vec);
+	mesh.vertices.push_back(vertex);
 }
 
-void ObjReader::insertPairs(const string &line, Mesh &mesh) { 
-    
+void ObjReader::handleNormalsAndPairs(const string &line, Mesh &mesh) {
+
     bool vertexIndex = true;
-    int normalIndex = 0;
 	std::string temp;
 	for (int i = 2; i < line.length(); ++i) {
 		switch(line[i]) {
 			case '/':
 				vertexIndex = false;
-                normalIndex++;
-                if (normalIndex == 2) {
-                    temp.append(1, ' ');
-                }
 				break;
 			case ' ':
 				vertexIndex = true;
-                normalIndex = 0;
 				temp.append(1, ' ');
 				break;
 			default:
-				if (!vertexIndex && normalIndex != 2) {
+				if (!vertexIndex) {
 					break;
 				}
 				temp.push_back(line[i]);
         }
 	}
-	
-	std::stringstream ss(temp);
 
-    IndexType v0, vn0, v1, vn1, v2, vn2;
-    ss >> v0 >> vn0 >> v1 >> vn1 >> v2 >> vn2; 
+    std::stringstream ss(temp);
 
-    if(vn0 == 0 || vn1 == 0 || vn2 == 0) {
-        throw std::runtime_error("normal missing in face definition (ObjReader)");
-    }
+    IndexType v0, v1, v2;
+    ss >> v0 >> v1 >> v2;     
+
+    Vector3 a = mesh.vertices[v0 - 1];
+    Vector3 b = mesh.vertices[v1 - 1];
+    Vector3 c = mesh.vertices[v2 - 1];
+
+    Vector3 ab = (b - a).normalized();
+    Vector3 ac = (c - a).normalized();
+
+    Vector3 normal = ab.cross(ac);
+    IndexType normalIdx;
+
+    mesh.normals.push_back(normal.normalized());
+    normalIdx = mesh.normals.size();
+    
+
     // -1: indices start at 1 but for later purposes it's easier if they start at 0
     std::array<std::tuple<IndexType, IndexType>, 3> indexTups {
-        std::make_tuple(v0 - 1, vn0 - 1),
-        std::make_tuple(v1 - 1, vn1 - 1),
-        std::make_tuple(v2 - 1, vn2 - 1)
+        std::make_tuple(v0 - 1, normalIdx - 1),
+        std::make_tuple(v1 - 1, normalIdx - 1),
+        std::make_tuple(v2 - 1, normalIdx - 1)
     };
-    for(auto& tup : indexTups) {
-        if(std::find(mesh.vertexNormalPairs.begin(), mesh.vertexNormalPairs.end(), tup)
+    for (auto& tup : indexTups) {
+        if (std::find(mesh.vertexNormalPairs.begin(), mesh.vertexNormalPairs.end(), tup)
                 == mesh.vertexNormalPairs.end()) {
             mesh.vertexNormalPairs.push_back(tup);
         }
     }
-}
 
-void ObjReader::insertNormal(const string &line, Mesh &mesh) {
-    
-    string temp;
-    for (int i = 2; i < line.length(); ++i) {
-        temp.push_back(line[i]);
-    }
+ 	// calculate the longest edge in the input mesh
+	Float edge0 = (a - b).norm();
+	Float edge1 = (a - c).norm();
+	Float edge2 = (b - c).norm();
 
-    std::stringstream ss(temp);
+	Float longestEdge = edge0;
+    if (edge1 > edge0) longestEdge = edge1;
+    if (edge2 > edge1) longestEdge = edge2;
 
-    Float x, y, z;
-    ss >> x >> y >> z;
-
-    Vector3 normal(x, y, z);
-	mesh.normals.push_back(normal.normalized());
+	if (longestEdge > mesh.longestEdge) {
+		mesh.longestEdge = longestEdge;
+	}
 }

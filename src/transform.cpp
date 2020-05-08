@@ -2,6 +2,7 @@
 #include <string>
 #include <iostream>
 #include <algorithm>
+#include <cmath>
 
 #include "transform.h"
 
@@ -23,7 +24,6 @@ void Transform::transformVerticesNaive(const Mesh &inputMesh,
                                        const std::vector<Matrix4, allocM> &matrices,
                                        Mesh &outputMesh)
 {
-    // transform the vertices with the given matrices
     for (int i = 0; i < inputMesh.vertices.size(); ++i) {
         Vector4 vert(inputMesh.vertices[i][0], inputMesh.vertices[i][1], inputMesh.vertices[i][2], 1);
         for (int j = 0; j < matrices.size(); ++j) {
@@ -38,24 +38,22 @@ void Transform::transformVerticesNaive(const Mesh &inputMesh,
 
 }
 
-/*
- * Thin out the points of the point cloud by calculating the directional movement (DM) of a point
- * and testing it with the normal vector of that point.
- * 
- * A point is a possible candidate of the enveloping surface if the DM and normal vector of a point 
- * are orthogonal.
- * 
- * Also calculates the measure of the orthogonality or the measure of members of the enveloping surface 
- * respectively.
- * 
- * In this case points refer to vertices.
- */
 void Transform::transformVerticesDM(const Mesh &inputMesh,
                                     const std::vector<Matrix4, allocM> &matrices,
                                     Mesh &outputMesh)
 {
+    Float maxVel = 0;
     for (int i = 0; i < matrices.size(); ++i) {
+
         int matSize = matrices.size();
+
+		if (i != matSize - 1) {
+			auto aabb = getAABB(inputMesh);	
+			Matrix4 current = matrices[i];
+			Matrix4 next = matrices[i+1];
+			auto maxV = getLargestMovement(aabb, current, next);
+			if (maxV > maxVel) maxVel = maxV;
+		}
 
         std::vector<Vector3, allocV> Ns;
         IndexType currVertexIdx = 0;
@@ -64,6 +62,9 @@ void Transform::transformVerticesDM(const Mesh &inputMesh,
         if (i == 0) diffMat = matrices[1] - matrices[0];
         else if (i == matSize - 1) diffMat = matrices[matSize - 1] - matrices[matSize - 2];
         else diffMat = matrices[i+1] - matrices[i-1];
+
+        Matrix4 before = matrices[i] - matrices[i-1];
+        Matrix4 after = matrices[i+1] - matrices[i];
 
         for (int j = 0; j < inputMesh.vertexNormalPairs.size(); ++j) {
             IndexType vertexIdx = std::get<0>(inputMesh.vertexNormalPairs[j]);
@@ -77,7 +78,7 @@ void Transform::transformVerticesDM(const Mesh &inputMesh,
                 Vector3 V(hV[0], hV[1], hV[2]);
                 V /= hV[3];
 
-                if(insertIfCriteria(hv, diffMat, Ns, c)) {
+                if(insertCriteria(hv, diffMat, before, after, Ns, c)) {
                     outputMesh.vertices.push_back(V);
                 }
 
@@ -90,7 +91,7 @@ void Transform::transformVerticesDM(const Mesh &inputMesh,
             hn << inputMesh.normals[normalIdx], 0;
 
             Vector4 hN = matrices[i] * hn; // correctly it would be (currentMat^T)^(-1),
-                                                 // equal to currentMat due to orthogonality
+                                           // equal to currentMat due to orthogonality
             Vector3 N(hN[0], hN[1], hN[2]);
             Ns.push_back(N);
         
@@ -102,43 +103,90 @@ void Transform::transformVerticesDM(const Mesh &inputMesh,
         Vector3 V(hV[0], hV[1], hV[2]);
         V /= hV[3];
 
-        if(insertIfCriteria(hv, diffMat, Ns, c)) {
+        if(insertCriteria(hv, diffMat, before, after, Ns, c)) {
             outputMesh.vertices.push_back(V);
         }
 
         Ns.clear();
     }
 
-    cout << "Resulting vertices: " << outputMesh.vertices.size() << endl;
+	cout << "Resulting vertices: " << outputMesh.vertices.size() << endl;
+	cout << "Max. movement a single vertex does during one time step: " << maxVel << endl;
+	cout << "Largest edge in the input mesh: " << inputMesh.longestEdge << endl;
 
 }
 
-bool Transform::insertIfCriteria(const Vector4 &hv, const Matrix4 &diffMat, 
-                         const std::vector<Vector3, allocV> &Ns, Cases c) {
+bool Transform::insertCriteria(const Vector4 &hv, const Matrix4 &diffMat, const Matrix4 &before,
+                                 const Matrix4 &after, const std::vector<Vector3, allocV> &Ns, Cases c) {
+
+
     Vector4 hv_diff = diffMat * hv;
     Vector3 v_diff = Vector3(hv_diff[0], hv_diff[1], hv_diff[2]).normalized();
+    const Float epsSC = 0.001;
 
-    bool isNeg = false;
+    for (auto& N : Ns) {
+        if (c == FIRST && v_diff.dot(N) < epsSC) {
+            return true;
+        }
+        else if (c == LAST && v_diff.dot(N) > - epsSC) {
+            return true;
+        }
+    }
+
+    Vector4 hDeltaT0 = before * hv;
+    Vector3 deltaT0 = Vector3(hDeltaT0[0], hDeltaT0[1], hDeltaT0[2]).normalized();
+    Vector4 hDeltaT1 = after * hv;
+    Vector3 deltaT1 = Vector3(hDeltaT1[0], hDeltaT1[1], hDeltaT1[2]).normalized();
+    Vector3 deltaT0T1 = (deltaT1 - deltaT0).normalized();
+    Float a_min, a_max;
+    Float b_min, b_max;
     bool isPos = false;
-    for (auto& N : Ns) {
-        bool sign = v_diff.dot(N) > 0;
-        isNeg = isNeg || !sign;
-        isPos = isPos || sign;
+    bool isNeg = false;
+    
+    bool sameDir = (deltaT0 - deltaT1).norm() < 0.000001; //10^(-6)
+
+    for (int i = 0; i < Ns.size(); ++i) {
+        Float a, b;
+        if (sameDir) {
+            bool sign = deltaT0.dot(Ns[i]) > 0;
+            isNeg = isNeg || !sign;
+            isPos = isPos || sign;
+        }
+        a = deltaT0.dot(Ns[i]);
+        b = deltaT1.dot(Ns[i]);
+        if (i == 0) {
+            a_min = a;
+            a_max = a;
+            b_min = b;
+            b_max = b;
+        }        
+        if (a > a_max) {
+            a_max = a;
+        }
+        else if (a < a_min) {
+            a_min = a;
+        }
+        if (b > b_max) {
+            b_max = b;
+        }
+        else if (b < b_min) {
+            b_min = b;
+        }
     }
 
-    if (isNeg && isPos) {
-        return true;
+    const Float eps = 0.0001;
+    if (sameDir) {
+        if (isNeg && isPos) {
+            return true;
+        }
+    }
+    else if (a_max >= -eps && a_min <= eps) {
+            return true;
+    }
+    else if (b_max >= 0 && b_min <= 0) {
+            return true;
     }
 
-    const Float eps = 0.1;
-    for (auto& N : Ns) {
-        if (c == FIRST && v_diff.dot(N) < eps) {
-            return true;
-        }
-        else if (c == LAST && v_diff.dot(N) > - eps) {
-            return true;
-        }
-    }
     return false;
 }
 
@@ -234,7 +282,7 @@ void Transform::transformVerticesRA(const Mesh &inputMesh,
  *  R^T is the transposed matrix of rotation matrix.
  *  t is the tranlation vector of the homogeneous 4x4 matrix.
  */
-Matrix4 Transform::invert(Matrix4 matrix) {
+Matrix4 Transform::invert(const Matrix4 &matrix) {
     Vector3 translation = matrix.block<3,1>(0,3);
     Matrix3 rotation = matrix.block<3,3>(0,0);
 
@@ -267,27 +315,21 @@ std::tuple<Vector3,Vector3> Transform::calculateRA(Matrix4 &matrix) {
 }
 
 /*
- * calculates the AABB (axis aligned bounding box) of the object at a certain time
- *
-std:vector<Vector3, allocV> Transform::getAABB(std::vector<Vector3, allocV> vertices, Matrix4 matrix) {
+ * calculates the AABB (axis aligned bounding box) of an object
+ */
+std::vector<Vector3, allocV> Transform::getAABB(const Mesh &inputMesh) {
     Float x_min, x_max, y_min, y_max, z_min, z_max;
-    for (int i = 0; i < vertices.size(); ++i) {
+    x_min = x_max = inputMesh.vertices[0][0];
+    y_min = y_max = inputMesh.vertices[0][1];
+    z_min = z_max = inputMesh.vertices[0][2];
+
+    for (int i = 1; i < inputMesh.vertices.size(); ++i) {
         
-        Vecor3 vertex = matrix * vertices[i];
+		Vector3 vertex = inputMesh.vertices[i];    
 
-        if (i == 0) {
-            x_min = vertex[0];
-            x_max = vertex[0];
-            y_min = vertex[1];
-            y_max = vertex[1];
-            z_min = vertex[2];
-            z_max = vertex[2];
-            break;
-        }
-
-        x_val = vertex[0];
-        y_val = vertex[1];
-        z_val = vertex[2];
+        auto x_val = vertex[0];
+        auto y_val = vertex[1];
+        auto z_val = vertex[2];
 
         if (x_val < x_min) x_min = x_val;
         else if (x_val > x_max) x_max = x_val;
@@ -296,22 +338,42 @@ std:vector<Vector3, allocV> Transform::getAABB(std::vector<Vector3, allocV> vert
         if (z_val < z_min) z_min = z_val;
         else if (z_val > z_max) z_max = z_val;
     }
-                7---8
-    z          /   /|
-    |  y      5---6 4
-    | /       |   |/
-    |/___ x   1---2
+    /*               7---8
+     *   z          /   /|
+     *   |  y      5---6 4
+     *   | /       |   |/
+     *   |/___ x   1---2
+	 */
 
     Vector3 one, two, three, four, five, six, seven, eight;
-    one << x_min, y_min, z_min;
-    two << x_max, y_min, z_min;
+    one <<   x_min, y_min, z_min;
+    two <<   x_max, y_min, z_min;
     three << x_min, y_max, z_min;
-    four << x_max, y_max, z_min;
-    five << x_min, y_min, z_max;
-    six << x_max, y_min, z_max;
+    four <<  x_max, y_max, z_min;
+    five <<  x_min, y_min, z_max;
+    six <<   x_max, y_min, z_max;
     seven << x_min, y_max, z_max;
     eight << x_max, y_max, z_max;
 
     std::vector<Vector3, allocV> aabb = {one, two, three, four, five, six, seven, eight};
     return aabb;
-}*/
+}
+
+Float Transform::getLargestMovement(const std::vector<Vector3, allocV> &aabb, const Matrix4 &current, const Matrix4 &next)
+{
+	Float max = 0;
+	for (int i = 0; i < 8; ++i) {
+		Vector4 vertex;
+		vertex << aabb[i], 1;
+		Vector4 vertex0 = current * vertex;
+		Vector4 vertex1 = next * vertex;
+		Vector3 v0 = Vector3(vertex0[0], vertex0[1], vertex0[2]);
+		v0 /= vertex0[3];
+		Vector3 v1 = Vector3(vertex1[0], vertex1[1], vertex1[2]);
+		v1 /= vertex1[3];
+		Float movement = (v1 - v0).norm();
+
+		if (movement > max) max = movement;
+	}
+	return max;
+}

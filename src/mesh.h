@@ -13,6 +13,7 @@ struct Mesh  {
     std::vector<Vector3, allocV> normals;
     // tuple(vertice, normal)
     std::vector<IndexTypePair> vertexNormalPairs;
+	Float longestEdge;
 
 };
 

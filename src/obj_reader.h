@@ -12,8 +12,7 @@ private:
     ObjReader() {}
 
     static void insertVertex(const std::string &line, Mesh &mesh);
-    static void insertPairs( const std::string &line, Mesh &mesh);
-    static void insertNormal(const std::string &line, Mesh &mesh);
+    static void handleNormalsAndPairs(const std::string &line, Mesh &mesh);
 };
 
 #endif
