@@ -13,8 +13,16 @@ struct Mesh  {
     std::vector<Vector3, allocV> normals;
     // tuple(vertice, normal)
     std::vector<IndexTypePair> vertexNormalPairs;
-	Float longestEdge;
+    std::vector<std::tuple<IndexType, IndexType, IndexType>> faces;
+	Float longestMeshEdge;
+    Float longestTemporalEdge;
 
+    static std::unique_ptr<Mesh> copyEmptyFrom(const Mesh &mesh) {
+        auto newMesh = std::make_unique<Mesh>();
+        newMesh->longestMeshEdge = mesh.longestMeshEdge;
+        newMesh->longestTemporalEdge = mesh.longestTemporalEdge;
+        return newMesh;
+    }
 };
 
 

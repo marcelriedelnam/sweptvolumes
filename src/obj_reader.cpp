@@ -6,6 +6,9 @@
 #include <iomanip>
 #include <memory>
 #include <stdexcept>
+#include <cmath>
+#include <algorithm>
+#include <iterator>
 
 #include "obj_reader.h"
 
@@ -26,7 +29,6 @@ std::unique_ptr<Mesh> ObjReader::read(const std::string &path) {
     }
 
     string input_line;
-    mesh->longestEdge = 0;
 
     while (std::getline(file, input_line)) {
         if (input_line[0] == 'v' && input_line[1] == ' ') {
@@ -38,12 +40,6 @@ std::unique_ptr<Mesh> ObjReader::read(const std::string &path) {
 
     file.close();
 
-    cout << mesh->vertices.size() << " vertices read." << endl;
-    cout << mesh->normals.size() << " normals read." << endl;
-    cout << mesh->vertexNormalPairs.size() << " vertex-normal pairs read."  << endl;
-
-    // sort the vertex-normal pairs for later calculations
-    std::sort(mesh->vertexNormalPairs.begin(), mesh->vertexNormalPairs.end());
     return mesh;
 }
 
@@ -67,9 +63,6 @@ void ObjReader::insertVertex(const string &line, Mesh &mesh) {
                0, 1,  0;
     
     Vector3 vertex = rotateX * vec;
-
-    //const Float scale = 0.001; // m to mm
-    //vec *= scale;
 
 	mesh.vertices.push_back(vertex);
 }
@@ -100,43 +93,8 @@ void ObjReader::handleNormalsAndPairs(const string &line, Mesh &mesh) {
     IndexType v0, v1, v2;
     ss >> v0 >> v1 >> v2;     
 
-    Vector3 a = mesh.vertices[v0 - 1];
-    Vector3 b = mesh.vertices[v1 - 1];
-    Vector3 c = mesh.vertices[v2 - 1];
-
-    Vector3 ab = (b - a).normalized();
-    Vector3 ac = (c - a).normalized();
-
-    Vector3 normal = ab.cross(ac);
-    IndexType normalIdx;
-
-    mesh.normals.push_back(normal.normalized());
-    normalIdx = mesh.normals.size();
-    
-
     // -1: indices start at 1 but for later purposes it's easier if they start at 0
-    std::array<std::tuple<IndexType, IndexType>, 3> indexTups {
-        std::make_tuple(v0 - 1, normalIdx - 1),
-        std::make_tuple(v1 - 1, normalIdx - 1),
-        std::make_tuple(v2 - 1, normalIdx - 1)
-    };
-    for (auto& tup : indexTups) {
-        if (std::find(mesh.vertexNormalPairs.begin(), mesh.vertexNormalPairs.end(), tup)
-                == mesh.vertexNormalPairs.end()) {
-            mesh.vertexNormalPairs.push_back(tup);
-        }
-    }
+    std::tuple<IndexType, IndexType, IndexType> face = std::make_tuple(v0 - 1, v1 - 1, v2 - 1);
+    mesh.faces.push_back(face);
 
- 	// calculate the longest edge in the input mesh
-	Float edge0 = (a - b).norm();
-	Float edge1 = (a - c).norm();
-	Float edge2 = (b - c).norm();
-
-	Float longestEdge = edge0;
-    if (edge1 > edge0) longestEdge = edge1;
-    if (edge2 > edge1) longestEdge = edge2;
-
-	if (longestEdge > mesh.longestEdge) {
-		mesh.longestEdge = longestEdge;
-	}
 }

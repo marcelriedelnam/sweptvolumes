@@ -16,5 +16,6 @@ using Matrix3 = Eigen::Matrix<Float, 3, 3>;
 using allocV = Eigen::aligned_allocator<Vector3>;
 using allocM = Eigen::aligned_allocator<Matrix4>;
 using IndexTypePair = std::tuple<IndexType, IndexType>;
+using Quaternion = Eigen::Quaternion<Float>;
 
 #endif

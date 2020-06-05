@@ -4,6 +4,7 @@
 #include "common.h"
 #include "obj_reader.h"
 #include "csv_reader.h"
+#include "process_mesh.h"
 
 
 class Transform {
@@ -34,6 +35,8 @@ private:
     static std::vector<Vector3, allocV> getAABB(const Mesh &inputMesh);
     static Float getLargestMovement(const std::vector<Vector3, allocV> &aabb, const Matrix4 &current, 
                                     const Matrix4 &next);
+    static Matrix4 buildHomogenousMatrix(const Matrix3 &mat, const Vector3 &vec);
+    static std::vector<Matrix4, allocM> subsampling(const std::vector<Matrix4, allocM> &matrices);
 
                                  
 

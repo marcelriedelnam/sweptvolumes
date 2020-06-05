@@ -10,9 +10,10 @@ using std::cout;
 using std::endl;
 
 std::unique_ptr<Mesh> Transform::transform(const Mesh &inputMesh, const std::vector<Matrix4, allocM> &matrices) {
-    auto outputMesh = std::make_unique<Mesh>();
+    auto outputMesh = Mesh::copyEmptyFrom(inputMesh);
+    auto subsampledMat = subsampling(matrices);
     // transformVerticesNaive(inputMesh, matrices, *outputMesh);
-    transformVerticesDM(inputMesh, matrices, *outputMesh);
+    transformVerticesDM(inputMesh, subsampledMat, *outputMesh);
     // transformVerticesRA(inputMesh, matrices, *outputMesh);
 
     return outputMesh;
@@ -47,6 +48,8 @@ void Transform::transformVerticesDM(const Mesh &inputMesh,
 
         int matSize = matrices.size();
 
+        //if (i != 76) continue;
+
 		if (i != matSize - 1) {
 			auto aabb = getAABB(inputMesh);	
 			Matrix4 current = matrices[i];
@@ -63,38 +66,45 @@ void Transform::transformVerticesDM(const Mesh &inputMesh,
         else if (i == matSize - 1) diffMat = matrices[matSize - 1] - matrices[matSize - 2];
         else diffMat = matrices[i+1] - matrices[i-1];
 
-        Matrix4 before = matrices[i] - matrices[i-1];
-        Matrix4 after = matrices[i+1] - matrices[i];
+        Matrix4 before, after;
+        if (i == 0) {
+            before = after = matrices[1] - matrices[0];
+        }
+        else if (i == matSize - 1) {
+            before = after = matrices[matSize - 1] - matrices[matSize - 2];
+        }
+        else {
+            before = matrices[i] - matrices[i-1];
+            after = matrices[i+1] - matrices[i];
+        }
 
         for (int j = 0; j < inputMesh.vertexNormalPairs.size(); ++j) {
             IndexType vertexIdx = std::get<0>(inputMesh.vertexNormalPairs[j]);
             IndexType normalIdx = std::get<1>(inputMesh.vertexNormalPairs[j]);
 
             if (vertexIdx != currVertexIdx && j != 0) {
-                Vector4 hv;
-                hv << inputMesh.vertices[currVertexIdx], 1;
-                Cases c = i == 0 ? FIRST : (i == matSize - 1 ? LAST : MID);
-                Vector4 hV = matrices[i] * hv;
-                Vector3 V(hV[0], hV[1], hV[2]);
-                V /= hV[3];
+            Vector4 hv;
+            hv << inputMesh.vertices[currVertexIdx], 1;
+            Cases c = i == 0 ? FIRST : (i == matSize - 1 ? LAST : MID);
+            Vector4 hV = matrices[i] * hv;
+            Vector3 V(hV[0], hV[1], hV[2]);
+            V /= hV[3];
 
-                if(insertCriteria(hv, diffMat, before, after, Ns, c)) {
-                    outputMesh.vertices.push_back(V);
-                }
-
-                Ns.clear();
-                currVertexIdx = vertexIdx;
+            if (insertCriteria(hv, diffMat, before, after, Ns, c)) {
+                outputMesh.vertices.push_back(V);
             }
 
-            
+            Ns.clear();
+            currVertexIdx = vertexIdx;
+        }
+
             Vector4 hn;
             hn << inputMesh.normals[normalIdx], 0;
 
             Vector4 hN = matrices[i] * hn; // correctly it would be (currentMat^T)^(-1),
-                                           // equal to currentMat due to orthogonality
+                                            // equal to currentMat due to orthogonality
             Vector3 N(hN[0], hN[1], hN[2]);
             Ns.push_back(N);
-        
         }
         Vector4 hv;
         hv << inputMesh.vertices[currVertexIdx], 1;
@@ -110,15 +120,13 @@ void Transform::transformVerticesDM(const Mesh &inputMesh,
         Ns.clear();
     }
 
-	cout << "Resulting vertices: " << outputMesh.vertices.size() << endl;
 	cout << "Max. movement a single vertex does during one time step: " << maxVel << endl;
-	cout << "Largest edge in the input mesh: " << inputMesh.longestEdge << endl;
-
+	cout << "Largest edge in the input mesh: " << inputMesh.longestMeshEdge << endl;
+    cout << endl;
 }
 
 bool Transform::insertCriteria(const Vector4 &hv, const Matrix4 &diffMat, const Matrix4 &before,
                                  const Matrix4 &after, const std::vector<Vector3, allocV> &Ns, Cases c) {
-
 
     Vector4 hv_diff = diffMat * hv;
     Vector3 v_diff = Vector3(hv_diff[0], hv_diff[1], hv_diff[2]).normalized();
@@ -137,21 +145,11 @@ bool Transform::insertCriteria(const Vector4 &hv, const Matrix4 &diffMat, const 
     Vector3 deltaT0 = Vector3(hDeltaT0[0], hDeltaT0[1], hDeltaT0[2]).normalized();
     Vector4 hDeltaT1 = after * hv;
     Vector3 deltaT1 = Vector3(hDeltaT1[0], hDeltaT1[1], hDeltaT1[2]).normalized();
-    Vector3 deltaT0T1 = (deltaT1 - deltaT0).normalized();
     Float a_min, a_max;
     Float b_min, b_max;
-    bool isPos = false;
-    bool isNeg = false;
-    
-    bool sameDir = (deltaT0 - deltaT1).norm() < 0.000001; //10^(-6)
 
     for (int i = 0; i < Ns.size(); ++i) {
-        Float a, b;
-        if (sameDir) {
-            bool sign = deltaT0.dot(Ns[i]) > 0;
-            isNeg = isNeg || !sign;
-            isPos = isPos || sign;
-        }
+        Float a, b, c;
         a = deltaT0.dot(Ns[i]);
         b = deltaT1.dot(Ns[i]);
         if (i == 0) {
@@ -174,17 +172,12 @@ bool Transform::insertCriteria(const Vector4 &hv, const Matrix4 &diffMat, const 
         }
     }
 
-    const Float eps = 0.0001;
-    if (sameDir) {
-        if (isNeg && isPos) {
-            return true;
-        }
+    const Float eps = 0.0001; //PARAMETER
+    if (a_max >= -eps && a_min <= eps) {
+        return true;
     }
-    else if (a_max >= -eps && a_min <= eps) {
-            return true;
-    }
-    else if (b_max >= 0 && b_min <= 0) {
-            return true;
+    else if (b_max >= -eps && b_min <= eps) {
+        return true;
     }
 
     return false;
@@ -376,4 +369,61 @@ Float Transform::getLargestMovement(const std::vector<Vector3, allocV> &aabb, co
 		if (movement > max) max = movement;
 	}
 	return max;
+}
+
+Matrix4 Transform::buildHomogenousMatrix(const Matrix3 &mat, const Vector3 &vec) {
+    Matrix4 res;
+    res << 0, 0, 0, 0,
+           0, 0, 0, 0,
+           0, 0, 0, 0,
+           0, 0, 0, 1;
+    res.block<3,3>(0,0) = mat;
+    res.block<3,1>(0,3) = vec;
+
+    return res;
+}
+
+std::vector<Matrix4, allocM> Transform::subsampling(const std::vector<Matrix4, allocM> &matrices) {
+    int subsamples = 0; //PARAMETER
+    Float nrSubsamples = 1.0 / (subsamples + 1);
+    std::vector<Matrix4, allocM> interpolated;
+
+    for (int i = 0; i < matrices.size() - 1; ++i) {
+
+        Vector3 transBeg = matrices[i].block<3,1>(0,3);
+        Vector3 transEnd = matrices[i+1].block<3,1>(0,3);
+        Matrix3 rotBeg = matrices[i].block<3,3>(0,0);
+        Matrix3 rotEnd = matrices[i+1].block<3,3>(0,0);
+
+        Matrix4 hMat;
+        hMat = buildHomogenousMatrix(rotBeg, transBeg);
+        interpolated.push_back(hMat);
+        for (int k = 1; k <= subsamples; k++) {
+            Float alpha = k * nrSubsamples;
+            // interpolate translation vector
+            Vector3 tRes = (1 - alpha) * transBeg + alpha * transEnd;
+            // get quaternion from rotation matrix
+            Quaternion qBeg(rotBeg);
+            Quaternion qEnd(rotEnd);
+            // interpolate quaternion
+            Quaternion qRes;
+            qRes = qBeg.slerp(alpha, qEnd); // TODO: reihenfolge?
+            // transform quaternion back to rotation matrix
+            Matrix3 rRes = qRes.normalized().toRotationMatrix();
+            // push back resulting interpolated matrix
+            hMat = buildHomogenousMatrix(rRes, tRes);
+            interpolated.push_back(hMat);
+        }
+
+    }
+
+    Vector3 translation = matrices[matrices.size() - 1].block<3,1>(0,3);
+    Matrix3 rotation = matrices[matrices.size() - 1].block<3,3>(0,0);
+    Matrix4 hMat;
+    hMat = buildHomogenousMatrix(rotation, translation);
+    interpolated.push_back(hMat);
+    cout << "Number of interpolated matrices: " << interpolated.size() << endl;
+    cout << endl;
+
+    return interpolated;
 }

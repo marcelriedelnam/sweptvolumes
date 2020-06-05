@@ -13,6 +13,7 @@ private:
 
     static void insertVertex(const std::string &line, Mesh &mesh);
     static void handleNormalsAndPairs(const std::string &line, Mesh &mesh);
+    static void simplfyEdge(Mesh &mesh, const Vector3 &v1, const Vector3 &v2, IndexType normalIdx);
 };
 
 #endif
