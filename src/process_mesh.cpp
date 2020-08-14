@@ -5,6 +5,7 @@
 #include <cmath>
 
 #include "process_mesh.h"
+#include "config.h"
 
 using std::cout;
 using std::endl;
@@ -12,24 +13,28 @@ using std::endl;
 std::vector<Vector3, allocV> ProcessMesh::tempNorms{};
 std::vector<Vector3, allocV> ProcessMesh::meanNorms{};
 std::vector<IndexTypePair> ProcessMesh::tempPairs{};
+GridStructure<IndexType> ProcessMesh::normalIdxGrid;
+GridStructure<IndexType> ProcessMesh::vertexIdxGrid;
+std::unordered_set<IndexTypePair, IndexTypePairHasher> ProcessMesh::vertexNormalPairSet;
 
 std::unique_ptr<Mesh> ProcessMesh::process(const Mesh &inputMesh) {
     auto outputMesh = std::make_unique<Mesh>();
     processMesh(inputMesh, *outputMesh);
 
-    cout << inputMesh.vertices.size() << " vertices read." << endl;
     cout << endl;
     cout << "After processing mesh:" << endl;
     cout << "Resulting vertices: " << outputMesh->vertices.size() << endl;
     cout << "Resulting normals: " << outputMesh->normals.size() << endl;
-    cout << "Resulting vertex-normal pairs: " << outputMesh->vertexNormalPairs.size() << endl;
     cout << endl;
 
     return outputMesh;
 }
 
 void ProcessMesh::processMesh(const Mesh &inputMesh, Mesh &outputMesh) {
-    
+    normalIdxGrid.setCellSize(ParameterConfig::gridCellLength);
+    vertexIdxGrid.setCellSize(ParameterConfig::gridCellLength);
+
+
     for (int i = 0; i < inputMesh.faces.size(); ++i) {
         IndexType vertIdx0 = std::get<0>(inputMesh.faces[i]);
         IndexType vertIdx1 = std::get<1>(inputMesh.faces[i]);
@@ -39,27 +44,36 @@ void ProcessMesh::processMesh(const Mesh &inputMesh, Mesh &outputMesh) {
         Vector3 b = inputMesh.vertices[vertIdx1];
         Vector3 c = inputMesh.vertices[vertIdx2];
 
-        Float areaSize = getArea(a, b, c);
-
         Vector3 ab = (b - a).normalized();
         Vector3 ac = (c - a).normalized();
+        Float angleA = std::acos(ab.dot(ac));
+        Vector3 normalA = ab.cross(ac).normalized();
+        Vector3 weightedNormalA = angleA * normalA;
 
-        Vector3 normal = ab.cross(ac).normalized();
-        Vector3 weightedNormal = areaSize * normal;
-        IndexType normalIdx;
+        Vector3 ba = (a - b).normalized();
+        Vector3 bc = (c - b).normalized();
+        Float angleB = std::acos(ba.dot(bc));
+        Vector3 normalB = ba.cross(bc).normalized();
+        Vector3 weightedNormalB = angleB * normalB;
 
-        tempNorms.push_back(weightedNormal);
-        normalIdx = tempNorms.size() - 1;
-        
-        
-        std::array<std::tuple<IndexType, IndexType>, 3> indexTups {
-            std::make_tuple(vertIdx0, normalIdx),
-            std::make_tuple(vertIdx1, normalIdx),
-            std::make_tuple(vertIdx2, normalIdx)
-        };
-        for (auto& tup : indexTups) {
-            tempPairs.push_back(tup);
-        }
+        Vector3 ca = (a - c).normalized();
+        Vector3 cb = (b - c).normalized();
+        Float angleC = std::acos(ca.dot(cb));
+        Vector3 normalC = ca.cross(cb).normalized();
+        Vector3 weightedNormalC = angleC * normalC;
+
+        IndexType normalIdxA, normalIdxB, normalIdxC;
+
+        tempNorms.push_back(weightedNormalA);
+        normalIdxA = tempNorms.size() - 1;
+        tempNorms.push_back(weightedNormalB);
+        normalIdxB = tempNorms.size() - 1;
+        tempNorms.push_back(weightedNormalC);
+        normalIdxC = tempNorms.size() - 1;
+
+        tempPairs.push_back(std::make_tuple(vertIdx0, normalIdxA));
+        tempPairs.push_back(std::make_tuple(vertIdx1, normalIdxB));
+        tempPairs.push_back(std::make_tuple(vertIdx2, normalIdxC));
         
     }
 
@@ -130,7 +144,8 @@ Float ProcessMesh::getArea(const Vector3 &v0, const Vector3 &v1, const Vector3 &
 
 void ProcessMesh::subdivide(const std::tuple<Vector3, Vector3> &tup0, const std::tuple<Vector3, Vector3> &tup1,
                             const std::tuple<Vector3, Vector3> &tup2, Mesh &outputMesh) {
-    Float maxEdgeLength = 0.04; //PARAMETER
+    Float maxEdgeLength = ParameterConfig::maxEdgelength; //PARAMETER
+    if (maxEdgeLength == 0) maxEdgeLength = std::numeric_limits<Float>::infinity();
 
     Vector3 v0 = std::get<0>(tup0);
     Vector3 v1 = std::get<0>(tup1);
@@ -145,10 +160,12 @@ void ProcessMesh::subdivide(const std::tuple<Vector3, Vector3> &tup0, const std:
     Float edgeLength2 = (v2 - v1).norm();
 
     if (edgeLength0 > maxEdgeLength && edgeLength1 > maxEdgeLength && edgeLength2 > maxEdgeLength) {
+        // mittelpunkt aller kanten
         Vector3 v01 = (v0 + v1) / 2.0;
         Vector3 v02 = (v0 + v2) / 2.0;
         Vector3 v12 = (v1 + v2) / 2.0;
 
+        // interpolierten normalen der mittelpunkte
         Vector3 n01 = ((n0 + n1) / 2.0).normalized();
         Vector3 n02 = ((n0 + n2) / 2.0).normalized();
         Vector3 n12 = ((n1 + n2) / 2.0).normalized();
@@ -235,16 +252,7 @@ void ProcessMesh::subdivide(const std::tuple<Vector3, Vector3> &tup0, const std:
         subdivide(tup0, tup12, tup2, outputMesh);
     }
     else {
-        // radius incircle triangle: r = 2A / (a + b + c)
-        Float area = getArea(v0, v1, v2);
-        Float circumference = edgeLength0 + edgeLength1 + edgeLength2;
-        Float radius = 2 * area / circumference;
-
-        Float areaTri0 = (edgeLength0 * radius) / 2.0;
-        Float areaTri1 = (edgeLength1 * radius) / 2.0;
-        Float areaTri2 = (edgeLength2 * radius) / 2.0;
-
-        Vector3 interpNorm = areaTri0 * n2 + areaTri1 * n1 + areaTri2 * n0;
+        Vector3 interpNorm = (n0 + n1 + n2) / 3;
         Vector3 nm = interpNorm.normalized();
 
         insertIfNotExisiting(outputMesh, v0, nm);
@@ -261,32 +269,25 @@ void ProcessMesh::subdivide(const std::tuple<Vector3, Vector3> &tup0, const std:
     }
 }
 
-void ProcessMesh::insertIfNotExisiting(Mesh &outputMesh, const Vector3 &vertice, const Vector3 &normal) {
+void ProcessMesh::insertIfNotExisiting(Mesh &outputMesh, const Vector3 &vertex, const Vector3 &normal) {
     IndexType vertexIdx;
     IndexType normalIdx;
 
-    auto it = std::find_if(outputMesh.normals.begin(), outputMesh.normals.end(), 
-            [&normal](const Vector3 &vec){return (normal - vec).squaredNorm() < 1e-8;});
-    if (it == outputMesh.normals.end()) {
+    if (!normalIdxGrid.contains(normal, normalIdx)) {
         outputMesh.normals.push_back(normal);
         normalIdx = outputMesh.normals.size() - 1;
-    }
-    else {
-        normalIdx = std::distance(outputMesh.normals.begin(), it);
+        normalIdxGrid.insert(normal, normalIdx);
     }
 
-    auto iter = std::find_if(outputMesh.vertices.begin(), outputMesh.vertices.end(),
-            [&vertice](const Vector3 &vec) {return (vertice - vec).squaredNorm() < 1e-8; });
-    if (iter == outputMesh.vertices.end()) {
-        outputMesh.vertices.push_back(vertice);
+    if (!vertexIdxGrid.contains(vertex, vertexIdx)) {
+        outputMesh.vertices.push_back(vertex);
         vertexIdx = outputMesh.vertices.size() - 1;
+        vertexIdxGrid.insert(vertex, vertexIdx);
     }
-    else {
-        vertexIdx = std::distance(outputMesh.vertices.begin(), iter);
-    }
+
     IndexTypePair tup = std::make_tuple(vertexIdx, normalIdx);
-    if (std::find(outputMesh.vertexNormalPairs.begin(), outputMesh.vertexNormalPairs.end(), tup)
-        == outputMesh.vertexNormalPairs.end()) {
+    if (vertexNormalPairSet.find(tup) == vertexNormalPairSet.end()) {
         outputMesh.vertexNormalPairs.push_back(tup);
+        vertexNormalPairSet.insert(tup);
     }
 }

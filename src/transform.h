@@ -30,15 +30,14 @@ private:
                                     Mesh &outputMesh);
     static std::tuple<Vector3,Vector3> calculateRA(Matrix4 &matrix);
     static Matrix4 invert(const Matrix4 &matrix);
-    static bool insertCriteria(const Vector4 &hv, const Matrix4 &diffMat, const Matrix4 &before,
-                                 const Matrix4 &after, const std::vector<Vector3, allocV> &Ns, Cases c);
+    static bool insertCriteria(const Vector4 &hv, const Matrix4 &after, const std::vector<Vector3, allocV> &Ns, 
+                               Cases c);
     static std::vector<Vector3, allocV> getAABB(const Mesh &inputMesh);
     static Float getLargestMovement(const std::vector<Vector3, allocV> &aabb, const Matrix4 &current, 
                                     const Matrix4 &next);
     static Matrix4 buildHomogenousMatrix(const Matrix3 &mat, const Vector3 &vec);
     static std::vector<Matrix4, allocM> subsampling(const std::vector<Matrix4, allocM> &matrices);
-
-                                 
+    static std::vector<Matrix4, allocM> newsampling(const std::vector<Matrix4, allocM> &matrices);
 
 };
 

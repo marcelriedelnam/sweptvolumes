@@ -24,8 +24,15 @@ std::unique_ptr<Mesh> ObjReader::read(const std::string &path) {
     std::ifstream file(path);
 
     if (!file.is_open()) {
-        cout << "Did not find file " << path << endl;
-        throw std::runtime_error("Did not find file " + path);
+        //cout << "Did not find file " << path << endl;
+        throw std::runtime_error("Did not find file.");
+    }
+    size_t dot = path.find_last_of(".");
+    string ext = path.substr(dot, path.size() - dot);
+    if (dot != string::npos) {
+        if (ext != ".obj") {
+            throw std::out_of_range("File is not the right format.");
+        }
     }
 
     string input_line;
@@ -34,12 +41,12 @@ std::unique_ptr<Mesh> ObjReader::read(const std::string &path) {
         if (input_line[0] == 'v' && input_line[1] == ' ') {
             insertVertex(input_line, *mesh);
         } else if (input_line[0] == 'f' && input_line[1] == ' ') {
-            handleNormalsAndPairs(input_line, *mesh);
+            insertFace(input_line, *mesh);
         }
     }
 
     file.close();
-
+    cout << mesh->vertices.size() << " vertices read." << endl;
     return mesh;
 }
 
@@ -67,7 +74,7 @@ void ObjReader::insertVertex(const string &line, Mesh &mesh) {
 	mesh.vertices.push_back(vertex);
 }
 
-void ObjReader::handleNormalsAndPairs(const string &line, Mesh &mesh) {
+void ObjReader::insertFace(const string &line, Mesh &mesh) {
 
     bool vertexIndex = true;
 	std::string temp;

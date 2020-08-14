@@ -4,6 +4,7 @@
 #include "common.h"
 #include "mesh.h"
 #include "obj_reader.h"
+#include "grid_structure.h"
 
 #include <vector>
 
@@ -24,6 +25,10 @@ private:
     static void subdivide(const std::tuple<Vector3, Vector3> &tup0, const std::tuple<Vector3, Vector3> &tup1,
                           const std::tuple<Vector3, Vector3> &tup2, Mesh &outputMesh);
     static void insertIfNotExisiting(Mesh &outputMesh, const Vector3 &vertice, const Vector3 &normal);
+
+    static GridStructure<IndexType> normalIdxGrid;
+    static GridStructure<IndexType> vertexIdxGrid;
+    static std::unordered_set<IndexTypePair, IndexTypePairHasher> vertexNormalPairSet;
 };
 
 #endif

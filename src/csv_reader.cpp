@@ -17,11 +17,17 @@ std::unique_ptr<vector<Matrix4, allocM>> CSVReader::read(const std::string &path
     auto matrices = std::make_unique<vector<Matrix4, allocM>>();
     std::ifstream file(path);
 
-    if (!file.is_open()) {
-        cout << "Did not find file " << path << endl;
-        throw std::runtime_error("Did not find file " + path);
+        if (!file.is_open()) {
+        throw std::runtime_error("Did not find file \"" + path + "\".");
     }
-
+    size_t dot = path.find_last_of(".");
+    string ext = path.substr(dot, path.size() - dot);
+    if (dot != string::npos) {
+        if (ext != ".csv") {
+            throw std::out_of_range("File is not the right format.");
+        }
+    }
+    
     string input_line;
 
     while (std::getline(file, input_line)) {
