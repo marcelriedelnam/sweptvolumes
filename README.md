@@ -5,7 +5,15 @@ This is the implementation for the thesis **Hüllkörperberechnung bewegter Star
 
 This implementation was written in C++ and uses the header only library Eigen. All relevant Eigen files are in the **include** directory.
 
-It can be run as follows:
+To compile the program, first create a **build** directory. To create the Makefiles, change to the **build** directory and run cmake:
+
+`> cmake..`
+
+Afterwards call make to compile the program:
+
+`> make`
+
+The program can be run from the **build** directory as follows:
 
 `> ./swept_volumes [object] [motion] {OPTIONS}`
 
