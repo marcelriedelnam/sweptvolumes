@@ -10,6 +10,7 @@
 #include <exception>
 #include <iomanip>
 #include <string>
+#include <chrono>
 
 using std::cout;
 using std::endl;
@@ -68,6 +69,8 @@ int handleArguments(int argc, char **argv) {
 
 int main(int argc, char **argv) {
 
+	auto startTime = std::chrono::high_resolution_clock::now();
+	
 	int i = handleArguments(argc, argv);
 	if (i == -1) return 0;
 
@@ -83,6 +86,8 @@ int main(int argc, char **argv) {
 		callHelpMessage(argv[0]);
 		return 1;
 	}
+
+	auto meshReadDoneTime = std::chrono::high_resolution_clock::now();
 	
 	// read the *.csv file from the second argument
 	std::unique_ptr<std::vector<Matrix4, allocM>> transformedMatrices;
@@ -96,21 +101,52 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 	
+	auto csvReadDoneTime = std::chrono::high_resolution_clock::now();
+	cout << "PROCESS MESH..." << endl;
 
 	// pre-process mesh before sweeping
 	std::unique_ptr<Mesh> processedMesh;
 	processedMesh = ProcessMesh::process(*inputMesh);
 
+	auto processMeshDoneTime = std::chrono::high_resolution_clock::now();
+	cout << "TRANSFORM MESH..." << endl;
+
 	// transform the vertices
 	std::unique_ptr<Mesh> transformedMesh;
 	transformedMesh = Transform::transform(*processedMesh, *transformedMatrices);
+
+	auto transformMeshDoneTime = std::chrono::high_resolution_clock::now();
+	cout << "SIMPLITY MESH..." << endl;
 
 	// remove inner vertices and make point cloud uniform
 	std::unique_ptr<Mesh> outputMesh;
 	outputMesh = Simplify::simplify(*transformedMesh);
 
+	auto simplityDoneTime = std::chrono::high_resolution_clock::now();
+
 	// write a *.obj file at the given destination
 	ObjWriter objWriter("../output/output.obj", *outputMesh);
 	//ObjWriter objWriter("../output/output.obj", *transformedMesh);
+
+	auto fileWrittenTime = std::chrono::high_resolution_clock::now();
+
+	auto printTime = [] (string name, std::chrono::duration<float> duration) {
+		auto min = std::chrono::duration_cast<std::chrono::minutes>(duration);
+		auto s = std::chrono::duration_cast<std::chrono::seconds>(duration - min);
+		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration - min - s);
+		cout << name << " " << min.count() << "min";
+		cout <<         " " << s.count() << "s";
+		cout <<         " " << ms.count() << "ms";
+		cout << endl;
+	};
+	cout << endl;
+	printTime("read Mesh:     ", meshReadDoneTime - startTime);
+	printTime("read CSV:      ", csvReadDoneTime - meshReadDoneTime);
+	printTime("process Mesh:  ", processMeshDoneTime - csvReadDoneTime);
+	printTime("transform Mesh:", transformMeshDoneTime - processMeshDoneTime);
+	printTime("simplifyMesh:  ", simplityDoneTime - transformMeshDoneTime);
+	printTime("write Mesh:    ", fileWrittenTime - simplityDoneTime);
+	cout <<   "---------------" << endl;
+	printTime("total:         ", fileWrittenTime - startTime);
 
 }
