@@ -7,7 +7,11 @@
 class Simplify {
 
 public:
-    static std::unique_ptr<Mesh> simplify(const Mesh &inputMesh);
+    static std::unique_ptr<Mesh> simplify(const Transform::TransformResult &inputMesh);
+    static std::unique_ptr<Mesh> simplify(const Mesh &inputMesh) {
+        auto transformResult = Transform::TransformResult::newFromMesh(inputMesh);
+        return simplify(*transformResult);
+    }
 private:   
 };
 

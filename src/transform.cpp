@@ -11,15 +11,18 @@
 using std::cout;
 using std::endl;
 
-std::unique_ptr<Mesh> Transform::transform(const Mesh &inputMesh, const std::vector<Matrix4, allocM> &matrices) {
-    auto outputMesh = Mesh::copyEmptyFrom(inputMesh);
+std::unique_ptr<Transform::TransformResult> Transform::transform(const Mesh &inputMesh, const std::vector<Matrix4, allocM> &matrices) {
+    auto result = std::make_unique<TransformResult>();
+    result->longestMeshEdge = inputMesh.longestMeshEdge;
+    result->longestTemporalEdge = inputMesh.longestTemporalEdge;
+
     //auto subsampledMat = subsampling(matrices);
     auto subsampledMat = newsampling(matrices);
     // transformVerticesNaive(inputMesh, matrices, *outputMesh);
-    transformVerticesDM(inputMesh, subsampledMat, *outputMesh);
+    transformVerticesDM(inputMesh, subsampledMat, *result);
     // transformVerticesRA(inputMesh, matrices, *outputMesh);
 
-    return outputMesh;
+    return result;
 }
 
 
@@ -44,69 +47,77 @@ void Transform::transformVerticesNaive(const Mesh &inputMesh,
 
 void Transform::transformVerticesDM(const Mesh &inputMesh,
                                     const std::vector<Matrix4, allocM> &matrices,
-                                    Mesh &outputMesh)
+                                    TransformResult &result)
 {
     Float maxVel = 0;
     auto aabb = getAABB(inputMesh);
-    for (int i = 0; i < matrices.size(); ++i) {
+    #pragma omp parallel
+    {
+        std::unique_ptr<std::vector<Vector3,allocV>> newVertices = std::make_unique<std::vector<Vector3,allocV>>();
+        #pragma omp for nowait // nowait: do not wait after for loop, directly continue to critical section
+        for (int i = 0; i < matrices.size(); ++i) {
 
-        int matSize = matrices.size();
+            int matSize = matrices.size();
 
-		if (i != matSize - 1) {
-			Matrix4 current = matrices[i];
-			Matrix4 next = matrices[i+1];
-			auto maxV = getLargestMovement(aabb, current, next);
-			if (maxV > maxVel) maxVel = maxV;
-		}
-
-        std::vector<Vector3, allocV> Ns;
-        IndexType currVertexIdx = 0;
-
-        Matrix4 diffMat;
-        if (i == 0) diffMat = matrices[1] - matrices[0];
-        else if (i == matSize - 1) diffMat = matrices[matSize - 1] - matrices[matSize - 2];
-        else diffMat = matrices[i+1] - matrices[i-1];
-
-        for (int j = 0; j < inputMesh.vertexNormalPairs.size(); ++j) {
-            IndexType vertexIdx = std::get<0>(inputMesh.vertexNormalPairs[j]);
-            IndexType normalIdx = std::get<1>(inputMesh.vertexNormalPairs[j]);
-
-            if (vertexIdx != currVertexIdx && j != 0) {
-                Vector4 hv;
-                hv << inputMesh.vertices[currVertexIdx], 1;
-                Cases c = i == 0 ? FIRST : (i == matSize - 1 ? LAST : MID);
-                Vector4 hV = matrices[i] * hv;
-                Vector3 V(hV[0], hV[1], hV[2]);
-                V /= hV[3];
-
-                if (insertCriteria(hv, diffMat, Ns, c)) {
-                    outputMesh.vertices.push_back(V);
-                }
-
-                Ns.clear();
-                currVertexIdx = vertexIdx;
+            if (i != matSize - 1) {
+                Matrix4 current = matrices[i];
+                Matrix4 next = matrices[i+1];
+                auto maxV = getLargestMovement(aabb, current, next);
+                if (maxV > maxVel) maxVel = maxV;
             }
-    
-            Vector4 hn;
-            hn << inputMesh.normals[normalIdx], 0;
 
-            Vector4 hN = matrices[i] * hn; // correctly it would be (currentMat^T)^(-1),
-                                            // equal to currentMat due to orthogonality
-            Vector3 N(hN[0], hN[1], hN[2]);
-            Ns.push_back(N);
+            std::vector<Vector3, allocV> Ns;
+            IndexType currVertexIdx = 0;
+
+            Matrix4 diffMat;
+            if (i == 0) diffMat = matrices[1] - matrices[0];
+            else if (i == matSize - 1) diffMat = matrices[matSize - 1] - matrices[matSize - 2];
+            else diffMat = matrices[i+1] - matrices[i-1];
+
+            for (int j = 0; j < inputMesh.vertexNormalPairs.size(); ++j) {
+                IndexType vertexIdx = std::get<0>(inputMesh.vertexNormalPairs[j]);
+                IndexType normalIdx = std::get<1>(inputMesh.vertexNormalPairs[j]);
+
+                if (vertexIdx != currVertexIdx && j != 0) {
+                    Vector4 hv;
+                    hv << inputMesh.vertices[currVertexIdx], 1;
+                    Cases c = i == 0 ? FIRST : (i == matSize - 1 ? LAST : MID);
+                    Vector4 hV = matrices[i] * hv;
+                    Vector3 V(hV[0], hV[1], hV[2]);
+                    V /= hV[3];
+
+                    if (insertCriteria(hv, diffMat, Ns, c)) {
+                        newVertices->push_back(V);
+                    }
+
+                    Ns.clear();
+                    currVertexIdx = vertexIdx;
+                }
+        
+                Vector4 hn;
+                hn << inputMesh.normals[normalIdx], 0;
+
+                Vector4 hN = matrices[i] * hn; // correctly it would be (currentMat^T)^(-1),
+                                                // equal to currentMat due to orthogonality
+                Vector3 N(hN[0], hN[1], hN[2]);
+                Ns.push_back(N);
+            }
+            Vector4 hv;
+            hv << inputMesh.vertices[currVertexIdx], 1;
+            Cases c = i == 0 ? FIRST : (i == matSize - 1 ? LAST : MID);
+            Vector4 hV = matrices[i] * hv;
+            Vector3 V(hV[0], hV[1], hV[2]);
+            V /= hV[3];
+
+            if(insertCriteria(hv, diffMat, Ns, c)) {
+                newVertices->push_back(V);
+            }
+
+            Ns.clear();
         }
-        Vector4 hv;
-        hv << inputMesh.vertices[currVertexIdx], 1;
-        Cases c = i == 0 ? FIRST : (i == matSize - 1 ? LAST : MID);
-        Vector4 hV = matrices[i] * hv;
-        Vector3 V(hV[0], hV[1], hV[2]);
-        V /= hV[3];
 
-        if(insertCriteria(hv, diffMat, Ns, c)) {
-            outputMesh.vertices.push_back(V);
-        }
-
-        Ns.clear();
+        #pragma omp critical
+        result.resultVertices.push_back(std::move(newVertices));
     }
 
 	cout << "Max. movement a single vertex does during one time step: " << maxVel << endl;

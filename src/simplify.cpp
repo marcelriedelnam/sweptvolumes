@@ -13,19 +13,22 @@ using std::endl;
 using Eigen::Vector3i;
 
 
-std::unique_ptr<Mesh> Simplify::simplify(const Mesh &inputMesh) {
-    auto outputMesh = Mesh::copyEmptyFrom(inputMesh);
+std::unique_ptr<Mesh> Simplify::simplify(const Transform::TransformResult &inputMesh) {
+	auto outputMesh = std::make_unique<Mesh>();
+	outputMesh->longestMeshEdge = inputMesh.longestMeshEdge;
+	outputMesh->longestTemporalEdge = inputMesh.longestTemporalEdge;
 
     std::unordered_map<Vector3i, std::vector<Vector3, allocV>, Vector3iHasher, std::equal_to<Vector3i>, allocMap> voxelGrid;
     Float longestEdge = std::max(inputMesh.longestMeshEdge, inputMesh.longestTemporalEdge);
     Float gridCellLength = ParameterConfig::gridCellLength;
 	Float radius = ParameterConfig::simplifyRadius;
 
-    for (int i = 0; i < inputMesh.vertices.size(); ++i) {
-        Vector3 vertex = inputMesh.vertices[i];
-        Vector3i coord = (vertex / gridCellLength).cast<int>();
-        voxelGrid[coord].push_back(vertex);
-    }
+	for(auto& vs : inputMesh.resultVertices) {
+		for (Vector3 v : *vs) {
+			Vector3i coord = (v / gridCellLength).cast<int>();
+			voxelGrid[coord].push_back(v);
+		}
+	}
 
 	while (!voxelGrid.empty()) {
 		Vector3 currSample = voxelGrid.begin()->second.at(0);

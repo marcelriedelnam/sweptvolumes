@@ -70,7 +70,8 @@ int handleArguments(int argc, char **argv) {
 int main(int argc, char **argv) {
 
 	auto startTime = std::chrono::high_resolution_clock::now();
-	
+
+
 	int i = handleArguments(argc, argv);
 	if (i == -1) return 0;
 
@@ -112,7 +113,7 @@ int main(int argc, char **argv) {
 	cout << "TRANSFORM MESH..." << endl;
 
 	// transform the vertices
-	std::unique_ptr<Mesh> transformedMesh;
+	std::unique_ptr<Transform::TransformResult> transformedMesh;
 	transformedMesh = Transform::transform(*processedMesh, *transformedMatrices);
 
 	auto transformMeshDoneTime = std::chrono::high_resolution_clock::now();
@@ -148,5 +149,5 @@ int main(int argc, char **argv) {
 	printTime("write Mesh:    ", fileWrittenTime - simplityDoneTime);
 	cout <<   "---------------" << endl;
 	printTime("total:         ", fileWrittenTime - startTime);
-
+	
 }

@@ -9,7 +9,33 @@
 
 class Transform {
 public:
-  static std::unique_ptr<Mesh> transform(const Mesh &mesh, 
+
+  class TransformResult {
+  public:
+    Float longestMeshEdge;
+    Float longestTemporalEdge;
+    std::vector<std::unique_ptr<std::vector<Vector3, allocV>>> resultVertices;
+
+    std::unique_ptr<Mesh> convertToMesh() {
+      auto mesh = std::make_unique<Mesh>();
+      mesh->longestMeshEdge = longestMeshEdge;
+      mesh->longestTemporalEdge = longestTemporalEdge;
+      for(auto& vs : resultVertices)
+        mesh->vertices.insert(mesh->vertices.end(), vs->begin(), vs->end());
+      return mesh;
+    }
+    static std::unique_ptr<TransformResult> newFromMesh(const Mesh& mesh) {
+      auto result = std::make_unique<TransformResult>();
+      result->longestMeshEdge = mesh.longestMeshEdge;
+      result->longestTemporalEdge = mesh.longestTemporalEdge;
+      auto v = std::make_unique<std::vector<Vector3, allocV>>();
+      v->insert(v->end(), mesh.vertices.begin(), mesh.vertices.end());
+      result->resultVertices.push_back(std::move(v));
+      return result;
+    }
+  };
+
+  static std::unique_ptr<TransformResult> transform(const Mesh &mesh, 
                                          const std::vector<Matrix4, allocM> &matrices);
 
 private:
@@ -24,7 +50,7 @@ private:
                                        Mesh &outputMesh);
     static void transformVerticesDM(const Mesh &inputMesh,
                                     const std::vector<Matrix4, allocM> &matrices,
-                                    Mesh &outputMesh);
+                                    TransformResult &result);
     static void transformVerticesRA(const Mesh &inputMesh,
                                     const std::vector<Matrix4, allocM> &matrices,
                                     Mesh &outputMesh);
